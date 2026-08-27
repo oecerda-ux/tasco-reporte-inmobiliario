@@ -809,11 +809,55 @@ function buildResumen(){
   sec.className = 'section active';
   sec.id = 'sec-resumen';
 
+  // Proyectos con presupuesto de costos incompleto: Costo Neto Proyectado < 50% del
+  // Ingreso Total Proyectado (bruto) es una señal fuerte de que no hay costo a término
+  // cargado (ej. Machalí/CDM sin presupuesto, o La Capellanía con solo costo real a la
+  // fecha) -su "Resultado" quedaría artificialmente inflado y distorsionaría los KPIs,
+  // gráficos y la tabla de Resumen General. Se excluyen de este resumen consolidado; sus
+  // páginas individuales (pestaña propia) se mantienen intactas con el detalle disponible.
+  const ordenResumen = DATA.orden.filter(code => {
+    const ingT = DATA.ingresos[code].ingreso_total_proyectado;
+    const costoT = DATA.costos[code].totales.estimado_termino;
+    return !ingT || costoT >= ingT * 0.5;
+  });
+  const proyectosExcluidosResumen = DATA.orden.filter(code => !ordenResumen.includes(code));
+  const excluidosSufijo = proyectosExcluidosResumen.length ? ` (excluye ${proyectosExcluidosResumen.join('/')}: presupuesto de costos incompleto)` : '';
+
+  // KPIs de Ingresos/Costos — Portafolio: recalculados en base a ordenResumen (en vez de
+  // DATA.kpis, que suma los 9 proyectos sin filtrar) para que también excluyan los
+  // proyectos sin presupuesto de costos completo y queden consistentes con los gráficos,
+  // la tabla y el Resultado de Gestión de más abajo.
+  let ingresoRealTotal=0, ingresoEstimadoTotal=0, ingresoTotalProyTotal=0, ingresoCobradoTotal=0,
+      costoEatTotal=0, costoRealTotal=0, presupuestoTotal=0, resultadoTotal=0, superficieResumen=0;
+  ordenResumen.forEach(code => {
+    const ing = DATA.ingresos[code], costos = DATA.costos[code], co = costos.totales;
+    ingresoRealTotal += ing.ingreso_real_bruto;
+    ingresoEstimadoTotal += ing.ingreso_estimado_bruto;
+    ingresoTotalProyTotal += ing.ingreso_total_proyectado;
+    ingresoCobradoTotal += ing.ingreso_cobrado;
+    costoEatTotal += co.estimado_termino;
+    costoRealTotal += co.real;
+    if (costos.tiene_presupuesto) { presupuestoTotal += co.presupuesto; resultadoTotal += co.resultado; }
+    superficieResumen += DATA.master[code].superficie_construida || 0;
+  });
+
   let html = '';
-  html += '<div class="kpi-group-label">Ingresos por Ventas — Portafolio</div>';
-  html += kpiRow(DATA.kpis.ingresos, 'kpi-ing');
-  html += '<div class="kpi-group-label">Costos Inmobiliarios — Portafolio</div>';
-  html += kpiRow(DATA.kpis.costos, 'kpi-cos');
+  html += `<div class="kpi-group-label">Ingresos por Ventas — Portafolio${excluidosSufijo}</div>`;
+  html += kpiRow([
+    {label:'Ingreso Total Proyectado', value: ingresoTotalProyTotal, unit:'UF', sub:'Real + Estimado, con IVA incluido'},
+    {label:'Ingreso Real (Vendido)', value: ingresoRealTotal, unit:'UF', sub:'Unidades ya reservadas/promesadas/escrituradas'},
+    {label:'Ingreso Estimado (Disponible)', value: ingresoEstimadoTotal, unit:'UF', sub:'Precio base unidades sin vender'},
+    {label:'Ingreso Cobrado a la Fecha', value: ingresoCobradoTotal, unit:'UF', sub:'Total conciliado real (base AO), excluye operaciones Desistidas'},
+    {label:'UF / m² Ingreso', value: superficieResumen ? ingresoTotalProyTotal/superficieResumen : 0, unit:'UF/m²', sub:'Ingreso total proyectado / m² construidos'},
+  ], 'kpi-ing');
+  html += `<div class="kpi-group-label">Costos Inmobiliarios — Portafolio${excluidosSufijo}</div>`;
+  html += kpiRow([
+    {label:'Costo Estimado a Término', value: costoEatTotal, unit:'UF', sub:'Real acumulado + proyección de costeo'},
+    {label:'Costo Real a la Fecha', value: costoRealTotal, unit:'UF', sub:'Activo inmobiliario acumulado (ACTIVOS_INM)'},
+    {label:'Presupuesto Total Aprobado', value: presupuestoTotal, unit:'UF', sub:'Presupuesto de costos por proyecto'},
+    {label:'Resultado Proyectado', value: resultadoTotal, unit:'UF', sub:'Presupuesto − Costo estimado a término'},
+    {label:'UF / m² Costo', value: superficieResumen ? costoEatTotal/superficieResumen : 0, unit:'UF/m²', sub:'Costo estimado a término / m² construidos'},
+  ], 'kpi-cos');
 
   // Resultado de Gestión del portafolio, consolidado con el motor tributario
   // "Gemini_TRIBUT" (ver calcTributario()): suma de Ingreso Neto Real, Débito/Crédito
@@ -830,7 +874,7 @@ function buildResumen(){
   let ingresoNetoPortafolio = 0, costoNetoPortafolio = 0, debitoPortafolio = 0,
       creditoPortafolio = 0, ceecPortafolio = 0, posicionNetaIvaPortafolio = 0,
       resultadoConsolidadoPortafolio = 0, ceecReconocidoPortafolio = 0;
-  DATA.orden.forEach(code => {
+  ordenResumen.forEach(code => {
     const t = calcTributario(code);
     ingresoNetoPortafolio += t.ingresoNetoReal;
     costoNetoPortafolio += t.costoNetoTotal;
@@ -884,7 +928,7 @@ function buildResumen(){
         <th class="num">IVA Crédito Fiscal (UF)</th>
       </tr></thead>
       <tbody>`;
-  DATA.orden.forEach(code=>{
+  ordenResumen.forEach(code=>{
     const m = DATA.master[code], ing = DATA.ingresos[code];
     const t = calcTributario(code);
     const resultadoFinal = t.mostrarResultadoReal ? t.resultadoRealATermino : t.resultadoNetoGestion;
@@ -902,18 +946,18 @@ function buildResumen(){
     </tr>`;
   });
   html += `</tbody></table></div>
-    <div class="note">Ingreso Total Proyectado = ingreso bruto proyectado a término por proyecto; Ingreso Neto Proyectado = Terreno + Base Imponible (o el mismo bruto si el proyecto es exento DS19), según el motor tributario "Gemini_TRIBUT". Resultado (UF) = Resultado Real a Término (Ingreso Neto Proyectado − Costo Neto Proyectado, ajustado por IVA No Recuperable y CEEC) en los proyectos donde ese ajuste aplica (venta mixta, sociedad independiente del grupo, TASCO constructora y vendedora a la vez, o CEEC aprobado > 0); en el resto es directamente Ingreso Neto Proyectado − Costo Neto Proyectado. Machalí (PMC) y Quintero/Costa del Mar (CDM) no cuentan con presupuesto de costos cargado — no se compara contra presupuesto, pero el resultado igual se calcula con Ingreso Neto Real vs. Costo Neto Proyectado.</div>
+    <div class="note">Ingreso Total Proyectado = ingreso bruto proyectado a término por proyecto; Ingreso Neto Proyectado = Terreno + Base Imponible (o el mismo bruto si el proyecto es exento DS19), según el motor tributario "Gemini_TRIBUT". Resultado (UF) = Resultado Real a Término (Ingreso Neto Proyectado − Costo Neto Proyectado, ajustado por IVA No Recuperable y CEEC) en los proyectos donde ese ajuste aplica (venta mixta, sociedad independiente del grupo, TASCO constructora y vendedora a la vez, o CEEC aprobado > 0); en el resto es directamente Ingreso Neto Proyectado − Costo Neto Proyectado.${proyectosExcluidosResumen.length ? ` No incluye ${proyectosExcluidosResumen.map(c=>`${DATA.master[c].nombre_comercial} (${c})`).join(', ')}: su Costo Neto Proyectado es menor al 50% del Ingreso Total Proyectado (presupuesto de costos incompleto), lo que infla artificialmente el resultado — ver el detalle disponible en su pestaña individual.` : ''}</div>
   </div>`;
 
   sec.innerHTML = html;
   sectionsDiv.appendChild(sec);
 
-  // Charts
-  const labels = DATA.orden.map(c => DATA.master[c].nombre_comercial);
-  const ingresoTotal = DATA.orden.map(c => DATA.ingresos[c].ingreso_total_proyectado);
-  const costoTermino = DATA.orden.map(c => DATA.costos[c].totales.estimado_termino);
-  const resultado = DATA.orden.map(c => DATA.costos[c].totales.resultado);
-  const tienePresupuesto = DATA.orden.map(c => DATA.costos[c].tiene_presupuesto);
+  // Charts (mismo filtro ordenResumen: excluye proyectos con presupuesto de costos incompleto)
+  const labels = ordenResumen.map(c => DATA.master[c].nombre_comercial);
+  const ingresoTotal = ordenResumen.map(c => DATA.ingresos[c].ingreso_total_proyectado);
+  const costoTermino = ordenResumen.map(c => DATA.costos[c].totales.estimado_termino);
+  const resultado = ordenResumen.map(c => DATA.costos[c].totales.resultado);
+  const tienePresupuesto = ordenResumen.map(c => DATA.costos[c].tiene_presupuesto);
 
   new Chart(document.getElementById('chartResumenBar'), {
     type:'bar',
