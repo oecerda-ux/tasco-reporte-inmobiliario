@@ -912,7 +912,7 @@ function buildResumen(){
       <div class="chart-box"><canvas id="chartResumenBar"></canvas></div>
     </div>
     <div class="card">
-      <h3>Resultado Proyectado por Proyecto (Presupuesto − Costo a Término)</h3>
+      <h3>Resultado por Proyecto (Ingreso Neto − Costo Neto, UF)</h3>
       <div class="chart-box"><canvas id="chartResumenResultado"></canvas></div>
     </div>
   </div>`;
@@ -956,8 +956,14 @@ function buildResumen(){
   const labels = ordenResumen.map(c => DATA.master[c].nombre_comercial);
   const ingresoTotal = ordenResumen.map(c => DATA.ingresos[c].ingreso_total_proyectado);
   const costoTermino = ordenResumen.map(c => DATA.costos[c].totales.estimado_termino);
-  const resultado = ordenResumen.map(c => DATA.costos[c].totales.resultado);
-  const tienePresupuesto = ordenResumen.map(c => DATA.costos[c].tiene_presupuesto);
+  // Resultado del gráfico = el mismo que la columna "Resultado" de la tabla Detalle por
+  // Proyecto (Ingreso Neto Proyectado − Costo Neto Proyectado, vía calcTributario()), NO
+  // el "Resultado Proyectado" (Presupuesto − Costo a Término) que es solo informativo y no
+  // forma parte de la gestión que se quiere medir aquí.
+  const resultado = ordenResumen.map(c => {
+    const t = calcTributario(c);
+    return t.mostrarResultadoReal ? t.resultadoRealATermino : t.resultadoNetoGestion;
+  });
 
   new Chart(document.getElementById('chartResumenBar'), {
     type:'bar',
@@ -973,12 +979,12 @@ function buildResumen(){
   new Chart(document.getElementById('chartResumenResultado'), {
     type:'bar',
     data:{ labels, datasets:[
-      {label:'Resultado Proyectado (UF)', data: resultado.map((v,i)=> tienePresupuesto[i]? v : null),
+      {label:'Resultado (UF)', data: resultado,
        backgroundColor: resultado.map(v=> v>=0 ? PALETTE.tealDark : PALETTE.terracota), borderRadius:4}
     ]},
-    options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+    options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false} },
-      scales:{ x:{ticks:{font:{size:10}, callback:v=>fmtNum(v)}}, y:{ticks:{font:{size:10}}} } }
+      scales:{ x:{ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}, callback:v=>fmtNum(v)}} } }
   });
 }
 
