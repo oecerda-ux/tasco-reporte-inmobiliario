@@ -821,12 +821,21 @@ function buildResumen(){
   // consolidada excluye a los proyectos en sociedad independiente (PROYECTOS_
   // INDEPENDIENTES, ej. Sauzal/ALC), ya que su remanente o débito no puede
   // compensarse contra el resto del holding.
+  // "Resultado Consolidado" suma, por proyecto, el mismo resultado que muestra la
+  // columna "Resultado" de la tabla "Detalle por Proyecto" (Resultado Real a Término
+  // cuando aplica -venta mixta, sociedad independiente, CEEC aprobado>0-, si no
+  // Resultado Neto Gestión). Se muestra aparte de "Resultado Neto Gestión" (que nunca
+  // incluye CEEC, por definición) para que el KPI de portafolio reconcilie con la suma
+  // de esa tabla.
   let ingresoNetoPortafolio = 0, costoNetoPortafolio = 0, debitoPortafolio = 0,
-      creditoPortafolio = 0, ceecPortafolio = 0, posicionNetaIvaPortafolio = 0;
+      creditoPortafolio = 0, ceecPortafolio = 0, posicionNetaIvaPortafolio = 0,
+      resultadoConsolidadoPortafolio = 0, ceecReconocidoPortafolio = 0;
   DATA.orden.forEach(code => {
     const t = calcTributario(code);
     ingresoNetoPortafolio += t.ingresoNetoReal;
     costoNetoPortafolio += t.costoNetoTotal;
+    resultadoConsolidadoPortafolio += (t.mostrarResultadoReal ? t.resultadoRealATermino : t.resultadoNetoGestion);
+    if (t.mostrarResultadoReal) ceecReconocidoPortafolio += t.ceec;
     if (!t.esIndependiente) {
       debitoPortafolio += t.ivaVenta;
       creditoPortafolio += t.creditoFiscalEAT;
@@ -836,6 +845,7 @@ function buildResumen(){
   });
   const resultadoNetoPortafolio = ingresoNetoPortafolio - costoNetoPortafolio;
   const resultadoNetoPortafolioPct = ingresoNetoPortafolio ? (resultadoNetoPortafolio/ingresoNetoPortafolio*100) : 0;
+  const resultadoConsolidadoPortafolioPct = ingresoNetoPortafolio ? (resultadoConsolidadoPortafolio/ingresoNetoPortafolio*100) : 0;
   const posicionLabelPortafolio = posicionNetaIvaPortafolio >= 0 ? 'IVA a Pagar al SII (Consolidado)' : 'Remanente IVA a Favor (Consolidado)';
 
   html += '<div class="kpi-group-label">Resultado de Gestión — Portafolio (Metodología Tributaria "Gemini_TRIBUT")</div>';
@@ -845,10 +855,12 @@ function buildResumen(){
     {label:'Costo Estimado a Término', value: costoNetoPortafolio, unit:'UF',
      sub:'Σ Costo Neto Total EAT por proyecto'},
     {label:'Resultado Neto Gestión', value: resultadoNetoPortafolio, unit:'UF',
-     sub:`Ingreso neto − Costo = rentabilidad real (${resultadoNetoPortafolioPct.toFixed(1)}% s/ ingreso neto)`},
+     sub:`Ingreso neto − Costo, sin CEEC (${resultadoNetoPortafolioPct.toFixed(1)}% s/ ingreso neto)`},
     {label: posicionLabelPortafolio, value: Math.abs(posicionNetaIvaPortafolio), unit:'UF',
-     sub:`Débito ${fmtNum(debitoPortafolio)} − Crédito EAT ${fmtNum(creditoPortafolio)} (CEEC ${fmtNum(ceecPortafolio)} no se resta: rebaja costo de obra, no el F29; excluye Sauzal/ALC, sociedad independiente)`},
-  ], 'kpi-ges', 'kpi-row-4');
+     sub:`Débito ${fmtNum(debitoPortafolio)} − Crédito EAT ${fmtNum(creditoPortafolio)} (CEEC ${fmtNum(ceecPortafolio)} no se resta aquí: en HOL ya viene rebajado en la factura de obra, en MDL/CLC es venta directa y se refleja en el Resultado Consolidado; excluye Sauzal/ALC, sociedad independiente)`},
+    {label:'Resultado Consolidado (Real a Término)', value: resultadoConsolidadoPortafolio, unit:'UF',
+     sub:`Resultado Neto Gestión + CEEC reconocido ${fmtNum(ceecReconocidoPortafolio)} en proyectos aplicables (${resultadoConsolidadoPortafolioPct.toFixed(1)}% s/ ingreso neto) — reconcilia con la suma de la columna "Resultado" en Detalle por Proyecto`},
+  ], 'kpi-ges');
 
   html += `<div class="grid-2">
     <div class="card">
