@@ -879,13 +879,13 @@ function buildResumen(){
     <table>
       <thead><tr>
         <th>Proyecto</th><th>Comuna</th><th class="num">Unid.</th><th class="num">m² Construidos</th>
-        <th class="num">Ingreso Real (UF)</th><th class="num">Ingreso Estimado (UF)</th><th class="num">Ingreso Total Proy. (UF)</th>
-        <th class="num">Costo Real (UF)</th><th class="num">Costo Est. Término (UF)</th><th class="num">Resultado (UF)</th>
+        <th class="num">Ingreso Total Proyectado (UF)</th><th class="num">Ingreso Neto Proyectado (UF)</th>
+        <th class="num">Costo Neto Proyectado (UF)</th><th class="num">CEEC (UF)</th><th class="num">Resultado (UF)</th>
         <th class="num">IVA Crédito Fiscal (UF)</th>
       </tr></thead>
       <tbody>`;
   DATA.orden.forEach(code=>{
-    const m = DATA.master[code], ing = DATA.ingresos[code], co = DATA.costos[code].totales;
+    const m = DATA.master[code], ing = DATA.ingresos[code];
     const t = calcTributario(code);
     const resultadoFinal = t.mostrarResultadoReal ? t.resultadoRealATermino : t.resultadoNetoGestion;
     html += `<tr>
@@ -893,17 +893,16 @@ function buildResumen(){
       <td>${m.comuna || '—'}</td>
       <td class="num">${fmtNum(m.unidades)}</td>
       <td class="num">${fmtNum(m.superficie_construida)}</td>
-      <td class="num">${fmtNum(ing.ingreso_real_bruto)}</td>
-      <td class="num">${fmtNum(ing.ingreso_estimado_bruto)}</td>
       <td class="num"><strong>${fmtNum(ing.ingreso_total_proyectado)}</strong></td>
-      <td class="num">${fmtNum(co.real)}</td>
-      <td class="num">${fmtNum(co.estimado_termino)}</td>
+      <td class="num">${fmtNum(t.ingresoNetoReal)}</td>
+      <td class="num">${fmtNum(t.costoNetoTotal)}</td>
+      <td class="num">${fmtNum(t.ceec)}</td>
       <td class="num ${signClass(resultadoFinal)}" title="${t.mostrarResultadoReal ? 'Resultado Real a Término' : 'Resultado Neto Gestión'}">${fmtNum(resultadoFinal)}</td>
       <td class="num">${fmtNum(DATA.iva_credito_fiscal[code]||0)}</td>
     </tr>`;
   });
   html += `</tbody></table></div>
-    <div class="note">Resultado (UF) = Resultado Real a Término (Resultado Neto Gestión ajustado por IVA No Recuperable y CEEC) en los proyectos donde ese ajuste aplica (venta mixta, sociedad independiente del grupo, o CEEC aprobado > 0); en el resto (ej. La Dehesa, donde no hay IVA no recuperable) es directamente el Resultado Neto Gestión. Machalí (PMC) y Quintero/Costa del Mar (CDM) no cuentan con presupuesto de costos cargado — no se compara contra presupuesto, pero el resultado igual se calcula con Ingreso Neto Real vs. Costo Estimado a Término.</div>
+    <div class="note">Ingreso Total Proyectado = ingreso bruto proyectado a término por proyecto; Ingreso Neto Proyectado = Terreno + Base Imponible (o el mismo bruto si el proyecto es exento DS19), según el motor tributario "Gemini_TRIBUT". Resultado (UF) = Resultado Real a Término (Ingreso Neto Proyectado − Costo Neto Proyectado, ajustado por IVA No Recuperable y CEEC) en los proyectos donde ese ajuste aplica (venta mixta, sociedad independiente del grupo, TASCO constructora y vendedora a la vez, o CEEC aprobado > 0); en el resto es directamente Ingreso Neto Proyectado − Costo Neto Proyectado. Machalí (PMC) y Quintero/Costa del Mar (CDM) no cuentan con presupuesto de costos cargado — no se compara contra presupuesto, pero el resultado igual se calcula con Ingreso Neto Real vs. Costo Neto Proyectado.</div>
   </div>`;
 
   sec.innerHTML = html;
