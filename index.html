@@ -398,6 +398,17 @@ const TIPOS_AFECTOS_IVA = {
 // su resultado real (si en cambio la posición fuera "a pagar", sí se descuenta, porque
 // ese desembolso de caja es real e independiente del resto del grupo).
 const PROYECTOS_INDEPENDIENTES = ['ALC']; // Inmobiliaria Sauzal, fuera del grupo
+// Proyectos donde TASCO actúa simultáneamente como constructora y vendedora/inmobiliaria
+// (a diferencia del resto, donde TASCO-constructora factura el contrato de construcción a
+// Sierrabella-inmobiliaria). Al no existir esa factura intercompañía, el CEEC (Art. 21 DL
+// 910) no se calcula sobre un "contrato general de construcción" sino sobre la VENTA
+// directa: es un crédito que TASCO declara en su propio F29 (Línea 111, código 126),
+// independiente de los costos de obra (CC 766/166 para MDL). A diferencia de Holandesa
+// -donde se asume que el CEEC ya viene rebajado en la factura de obra a suma alzada y no
+// debe sumarse de nuevo-, en estos proyectos el CEEC es un beneficio real que aún no está
+// reflejado en el Costo Neto Total, por lo que sí debe sumarse al Resultado Real a Término
+// aunque el proyecto sea 100% exento DS19 (ver mostrarResultadoReal).
+const PROYECTOS_CONSTRUCTORA_VENDEDORA = ['MDL', 'CLC'];
 // Ajustes manuales al Ingreso Neto Proyectado para aislar efectos puntuales del resultado
 // "de gestión" (ej. descuentos agresivos otorgados a ventas de funcionarios internos, que
 // no reflejan el resultado comercial real del proyecto). Se suman al Ingreso Neto Real
@@ -492,11 +503,15 @@ function calcTributario(code){
   // real de construcción (ya sea vía factura a suma alzada o como franquicia propia del
   // proyecto), por lo que se reconoce íntegro en el resultado aunque no aparezca en el F29
   // (ver posicionNetaIva arriba) ni se comparta con otros proyectos del holding si la SPE es
-  // independiente. Se muestra para: proyectos mixtos, independientes del grupo, o cualquier
-  // proyecto de régimen general con CEEC aprobado > 0 (si es 0, el resultado no cambia y no
-  // aporta mostrar la card aparte).
+  // independiente. Se muestra para: proyectos mixtos, independientes del grupo, proyectos
+  // donde TASCO es constructora y vendedora a la vez (PROYECTOS_CONSTRUCTORA_VENDEDORA,
+  // CEEC por venta directa nunca embebido en el costo), o cualquier proyecto de régimen
+  // general con CEEC aprobado > 0 (si es 0, el resultado no cambia y no aporta mostrar la
+  // card aparte). Los demás proyectos 100% exentos DS19 (PMC, CDM) no entran porque no
+  // tienen CEEC aprobado.
   const esIndependiente = PROYECTOS_INDEPENDIENTES.includes(code);
-  const mostrarResultadoReal = !exentoTotal && (mixto || esIndependiente || ceec > 0);
+  const esConstructoraVendedora = PROYECTOS_CONSTRUCTORA_VENDEDORA.includes(code);
+  const mostrarResultadoReal = (!exentoTotal || esConstructoraVendedora) && (mixto || esIndependiente || ceec > 0);
   let resultadoRealATermino = null;
   if (mostrarResultadoReal) {
     resultadoRealATermino = resultadoNetoGestion - ivaNoRecuperable + ceec;
@@ -516,7 +531,7 @@ function calcTributario(code){
     creditoReal, creditoProyectado, creditoFiscalEAT, ceec, posicionNetaIva,
     prorrataAfectaPct, creditoFiscalUtilizable, ivaNoRecuperable,
     ingresoNetoReal, costoNetoTotal, resultadoNetoGestion, ajusteIngresoNeto,
-    esIndependiente, resultadoRealATermino, mostrarResultadoReal,
+    esIndependiente, esConstructoraVendedora, resultadoRealATermino, mostrarResultadoReal,
   };
 }
 
@@ -960,7 +975,7 @@ function buildProject(code){
   <div class="mini-kpis ${t.mostrarResultadoReal ? 'mini-kpis-3' : 'mini-kpis-2'}">
     <div class="mini-card gestion"><div class="m-label">Resultado Neto Gestión</div><div class="m-value ${signClass(t.resultadoNetoGestion)}">${fmtNum(t.resultadoNetoGestion)} UF</div><div class="m-sub">Ingreso neto ${fmtNum(t.ingresoNetoReal)} − Costo neto ${fmtNum(t.costoNetoTotal)} (${fmtNum(resultadoNetoPct,1)}% s/ ingreso neto)</div></div>
     <div class="mini-card gestion"><div class="m-label">${posicionLabel}</div><div class="m-value ${t.exento ? '' : signClass(-t.posicionNetaIva)}">${t.exento ? '—' : fmtNum(Math.abs(t.posicionNetaIva))+' UF'}</div><div class="m-sub">${t.exento ? 'Exento (DS19)' : (t.mixto ? `CEEC ${fmtNum(t.ceec)} − IVA No Recuperable ${fmtNum(t.ivaNoRecuperable)} (Débito/Crédito ya reflejados en Ingreso Neto Real, no se repiten aquí)` : `Débito ${fmtNum(t.ivaVenta)} − Crédito EAT ${fmtNum(t.creditoFiscalEAT)}${t.ceec>0 ? ' (CEEC ya rebajado en factura de obra, no se resta aquí)' : ''}`)}</div></div>
-    ${t.mostrarResultadoReal ? `<div class="mini-card gestion"><div class="m-label">Resultado Real a Término</div><div class="m-value ${signClass(t.resultadoRealATermino)}">${fmtNum(t.resultadoRealATermino)} UF</div><div class="m-sub">Resultado Neto Gestión${t.ivaNoRecuperable>0 ? ` − IVA No Recuperable ${fmtNum(t.ivaNoRecuperable)} (a costo, Art. 23 N°2/N°3 LIVS)` : ''} + CEEC ${fmtNum(t.ceec)} (DL 910 Art. 21${t.mixto ? ', franquicia propia del proyecto' : ', ya rebajado en factura de obra'}).${(t.esIndependiente && !t.mixto) ? ' Sociedad independiente del grupo: un eventual remanente no se reconoce como beneficio ni se compensa con otros proyectos del holding.' : ''}</div></div>` : ''}
+    ${t.mostrarResultadoReal ? `<div class="mini-card gestion"><div class="m-label">Resultado Real a Término</div><div class="m-value ${signClass(t.resultadoRealATermino)}">${fmtNum(t.resultadoRealATermino)} UF</div><div class="m-sub">Resultado Neto Gestión${t.ivaNoRecuperable>0 ? ` − IVA No Recuperable ${fmtNum(t.ivaNoRecuperable)} (a costo, Art. 23 N°2/N°3 LIVS)` : ''} + CEEC ${fmtNum(t.ceec)} (DL 910 Art. 21${t.mixto ? ', franquicia propia del proyecto' : (t.esConstructoraVendedora ? ', venta directa: TASCO es constructora y vendedora, sin factura de obra intercompañía — el crédito se declara en su propio F29 (línea 111, código 126) y no está reflejado en el Costo Neto Total' : ', ya rebajado en factura de obra')}).${(t.esIndependiente && !t.mixto) ? ' Sociedad independiente del grupo: un eventual remanente no se reconoce como beneficio ni se compensa con otros proyectos del holding.' : ''}</div></div>` : ''}
   </div>`;
 
   html += `<div class="card">
