@@ -234,7 +234,7 @@
   .sg-legend-item{display:flex; align-items:center; gap:6px;}
   .sg-swatch{width:12px; height:12px; border-radius:3px; display:inline-block;}
 
-  .sales-grid{overflow:visible; border:1px solid #eee; border-radius:8px; padding:6px;}
+  .sales-grid{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #eee; border-radius:8px; padding:6px;}
   .sg-table{display:inline-flex; flex-direction:column; min-width:100%;}
   .sg-row{display:flex; align-items:stretch; border-bottom:1px solid #f0ede9; padding:6px 2px;}
   .sg-row:last-child{border-bottom:none;}
@@ -306,6 +306,41 @@
     .kpi-row.kpi-row-3, .kpi-row.kpi-row-4{grid-template-columns:repeat(2,1fr);}
     .grid-2{grid-template-columns:1fr;}
     .mini-kpis, .mini-kpis.mini-kpis-5, .mini-kpis.mini-kpis-4, .mini-kpis.mini-kpis-3, .mini-kpis.mini-kpis-2{grid-template-columns:repeat(2,1fr);}
+    .revdata-kpis{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* Teléfonos y tablets chicas: navegación por pestañas con scroll horizontal (en vez de
+     envolver en muchas filas), tarjetas KPI en una sola columna, más espacio táctil, y
+     menos padding para aprovechar el ancho disponible. */
+  @media(max-width:680px){
+    .wrap{padding:12px;}
+    header.top{padding:16px 18px;}
+    header.top h1{font-size:16.5px;}
+    header.top .meta{text-align:left; font-size:11.5px;}
+    nav.tabs{
+      flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scrollbar-width:thin; padding:8px;
+    }
+    nav.tabs button{padding:10px 15px; font-size:12.5px;}
+    .kpi-row, .kpi-row.kpi-row-3, .kpi-row.kpi-row-4{grid-template-columns:1fr;}
+    .revdata-kpis{grid-template-columns:1fr 1fr;}
+    .mini-kpis, .mini-kpis.mini-kpis-5, .mini-kpis.mini-kpis-4, .mini-kpis.mini-kpis-3, .mini-kpis.mini-kpis-2{grid-template-columns:1fr 1fr;}
+    .revdata-conceptos{grid-template-columns:1fr;}
+    .card{padding:14px 14px;}
+    .kpi-card{padding:14px 14px 12px; min-height:auto;}
+    .kpi-card .kpi-value{font-size:21px;}
+    .proj-header, .revdata-header{padding:14px 16px; flex-direction:column; align-items:flex-start;}
+    .revdata-total{text-align:left;}
+    .chart-box{height:220px;}
+    table{font-size:11.5px;}
+    thead th, tbody td{padding:6px 7px;}
+    .view-toggle button, .tower-btn{padding:7px 12px;}
+    footer{padding:20px 8px 8px;}
+  }
+
+  @media(max-width:400px){
+    .mini-kpis, .mini-kpis.mini-kpis-5, .mini-kpis.mini-kpis-4, .mini-kpis.mini-kpis-3, .mini-kpis.mini-kpis-2{grid-template-columns:1fr;}
+    .revdata-kpis{grid-template-columns:1fr;}
   }
 </style>
 </head>
